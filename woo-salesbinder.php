@@ -55,7 +55,6 @@ class WC_SalesBinder {
         }
     }
 
-
     public function force_sync() {
 
         $this->update_settings();
@@ -298,7 +297,6 @@ class WC_SalesBinder {
         wc_print_notice( str_repeat('-', 16). ' SalesBinder sync completed ' . str_repeat('-', 16), 'notice');
     }
 
-
     public function sync_categories()
     {
         $page = 1;
@@ -308,11 +306,12 @@ class WC_SalesBinder {
         $api_key = get_option( 'wcsalesbinder_apikey' );
 
         do {
-          $url = 'https://'.$api_key.':x@' . $subdomain . '.salesbinder.com/api/2.0/categories.json?page=' . $page;
-          $response = wp_remote_get($url, array('timeout' => 60,));
+          $url = 'https://'.$api_key.':x@'.$subdomain.'.salesbinder.com/api/2.0/categories.json?page=' . $page;
+          $response = wp_remote_get($url, $this->basic_args_for_get_request($api_key));
 
           if (wp_remote_retrieve_response_code($response) != 200 || is_wp_error($response)) {
             wc_print_notice('SalesBinder sync failed to load ' . $url, 'error');
+            wc_print_notice('SalesBinder sync failed with response ' . var_dump($response), 'error');
             return;
           }
 
@@ -320,6 +319,8 @@ class WC_SalesBinder {
 
           if (!empty($response['categories'][0])) {
             foreach ($response['categories'][0] as $category) {
+
+              wc_print_notice('Category: '. var_dump($category), 'notice');
 
               $server_categories[] = $category['id'];
               $category_name = sanitize_text_field(str_replace('&', '&amp;', $category['name'])); // clean ampersands
@@ -392,11 +393,11 @@ class WC_SalesBinder {
 
           if (isset($partial)) {
             $timestamp12 = (!empty($wcsalesbinder_last_synced)) ? ($wcsalesbinder_last_synced - 3600) : (time() - 43200);
-            $url = 'https://'.$api_key.':x@' . $subdomain . '.salesbinder.com/api/2.0/items.json?page=' . $page . '&pageLimit=50&modifiedSince='.$timestamp12;
+            $url = 'https://'.$subdomain . '.salesbinder.com/api/2.0/items.json?page=' . $page . '&pageLimit=50&modifiedSince='.$timestamp12;
           }else{
-            $url = 'https://'.$api_key.':x@' . $subdomain . '.salesbinder.com/api/2.0/items.json?page=' . $page . '&pageLimit=50';
+            $url = 'https://'.$subdomain . '.salesbinder.com/api/2.0/items.json?page=' . $page . '&pageLimit=50';
           }
-          $response = wp_remote_get($url, array('timeout' => 60));
+          $response = wp_remote_get($url, $this->basic_args_for_get_request($api_key));
 
           if (wp_remote_retrieve_response_code($response) != 200 || is_wp_error($response)) {
             wc_print_notice('SalesBinder sync failed to load ' . $url, 'error');
@@ -640,10 +641,8 @@ class WC_SalesBinder {
         $subdomain = get_option( 'wcsalesbinder_subdomain' );
         $api_key = get_option( 'wcsalesbinder_apikey' );
 
-		    $url = 'https://'.$api_key.':x@' . $subdomain . '.salesbinder.com/api/2.0/customers.json?emailAddress=' . urlencode($email);
-        $response = wp_remote_get($url, array(
-          'timeout' => 30
-        ));
+		    $url = 'https://'. $subdomain . '.salesbinder.com/api/2.0/customers.json?emailAddress=' . urlencode($email);
+        $response = wp_remote_get($url, $this->basic_args_for_get_request($api_key));
 
         if (wp_remote_retrieve_response_code($response) != 200 || is_wp_error($response)) {
           wc_print_notice('SalesBinder sync failed to load ' . $url, 'error');
@@ -978,7 +977,16 @@ class WC_SalesBinder {
         }
     }
 
+    public function basic_args_for_get_request($api_key) {
+      $args = array(
+        'headers' => array(
+          'Authorization' => 'Basic ' . base64_encode( $api_key . ':' . "x" )
+        ),
+        'timeout' => 60,
+      );
 
+      return $args;
+    }
 }
 
 add_action( 'init', array( 'WC_SalesBinder', 'get_instance' ), 0 );
